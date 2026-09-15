@@ -1,4 +1,6 @@
+```python
 # -*- coding: utf-8 -*-
+
 import os
 import sqlite3
 from typing import List, Dict, Any, Optional
@@ -42,7 +44,7 @@ class TrackerDB:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     category TEXT NOT NULL,
                     target_seconds INTEGER NOT NULL,
-                    period_type TEXT NOT NULL, -- 'daily', 'weekly', 'monthly'
+                    period_type TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 )
             """)
@@ -58,7 +60,8 @@ class TrackerDB:
                     created_at TEXT NOT NULL
                 )
             """)
-           # 4. 日历与循环任务表 (calendar_tasks)
+
+            # 4. 日历与循环任务表 (calendar_tasks)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS calendar_tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,16 +80,31 @@ class TrackerDB:
     # Session 关联操作 (时间记录)
     # ----------------------------------------------------------------------
 
-    def add_session(self, category: str, task_name: str, start_time: datetime, end_time: datetime) -> int:
+    def add_session(
+        self,
+        category: str,
+        task_name: str,
+        start_time: datetime,
+        end_time: datetime
+    ) -> int:
         """添加一条时间记录"""
         duration = int((end_time - start_time).total_seconds())
+
         if duration < 0:
             duration = 0
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                INSERT INTO sessions (category, task_name, start_time, end_time, duration, created_at)
+                INSERT INTO sessions (
+                    category,
+                    task_name,
+                    start_time,
+                    end_time,
+                    duration,
+                    created_at
+                )
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 category,
@@ -96,6 +114,7 @@ class TrackerDB:
                 duration,
                 datetime.now().isoformat()
             ))
+
             conn.commit()
             return cursor.lastrowid
 
@@ -103,155 +122,307 @@ class TrackerDB:
         """删除一条时间记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+
+            cursor.execute(
+                "DELETE FROM sessions WHERE id = ?",
+                (session_id,)
+            )
+
             conn.commit()
 
-    def get_sessions_range(self, start_dt: datetime, end_dt: datetime) -> List[Dict[str, Any]]:
+    def get_sessions_range(
+        self,
+        start_dt: datetime,
+        end_dt: datetime
+    ) -> List[Dict[str, Any]]:
         """按时间范围查询记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                SELECT * FROM sessions
+                SELECT *
+                FROM sessions
                 WHERE start_time >= ? AND start_time <= ?
                 ORDER BY start_time DESC
-            """, (start_dt.isoformat(), end_dt.isoformat()))
+            """, (
+                start_dt.isoformat(),
+                end_dt.isoformat()
+            ))
+
             rows = cursor.fetchall()
+
             return [dict(row) for row in rows]
 
-    def get_category_durations(self, start_dt: datetime, end_dt: datetime) -> Dict[str, int]:
+    def get_category_durations(
+        self,
+        start_dt: datetime,
+        end_dt: datetime
+    ) -> Dict[str, int]:
         """按分类统计指定时间范围内的总时长 (秒)"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                SELECT category, SUM(duration) as total_duration
+                SELECT category, SUM(duration) AS total_duration
                 FROM sessions
                 WHERE start_time >= ? AND start_time <= ?
                 GROUP BY category
-            """, (start_dt.isoformat(), end_dt.isoformat()))
+            """, (
+                start_dt.isoformat(),
+                end_dt.isoformat()
+            ))
+
             rows = cursor.fetchall()
-            return {row["category"]: row["total_duration"] for row in rows}
+
+            return {
+                row["category"]: row["total_duration"]
+                for row in rows
+            }
 
     # ----------------------------------------------------------------------
     # Plan 关联操作 (目标计划)
     # ----------------------------------------------------------------------
 
-    def set_plan(self, category: str, target_seconds: int, period_type: str = "daily"):
+    def set_plan(
+        self,
+        category: str,
+        target_seconds: int,
+        period_type: str = "daily"
+    ):
         """设置或更新分类的目标时长"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                SELECT id FROM plans WHERE category = ? AND period_type = ?
-            """, (category, period_type))
+                SELECT id
+                FROM plans
+                WHERE category = ? AND period_type = ?
+            """, (
+                category,
+                period_type
+            ))
+
             row = cursor.fetchone()
 
             if row:
                 cursor.execute("""
-                    UPDATE plans SET target_seconds = ? WHERE id = ?
-                """, (target_seconds, row["id"]))
+                    UPDATE plans
+                    SET target_seconds = ?
+                    WHERE id = ?
+                """, (
+                    target_seconds,
+                    row["id"]
+                ))
             else:
                 cursor.execute("""
-                    INSERT INTO plans (category, target_seconds, period_type, created_at)
+                    INSERT INTO plans (
+                        category,
+                        target_seconds,
+                        period_type,
+                        created_at
+                    )
                     VALUES (?, ?, ?, ?)
-                """, (category, target_seconds, period_type, datetime.now().isoformat()))
+                """, (
+                    category,
+                    target_seconds,
+                    period_type,
+                    datetime.now().isoformat()
+                ))
+
             conn.commit()
 
-    def get_plans(self, period_type: str = "daily") -> Dict[str, int]:
+    def get_plans(
+        self,
+        period_type: str = "daily"
+    ) -> Dict[str, int]:
         """获取指定周期类型的所有计划目标 (秒)"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                SELECT category, target_seconds FROM plans WHERE period_type = ?
+                SELECT category, target_seconds
+                FROM plans
+                WHERE period_type = ?
             """, (period_type,))
+
             rows = cursor.fetchall()
-            return {row["category"]: row["target_seconds"] for row in rows}
+
+            return {
+                row["category"]: row["target_seconds"]
+                for row in rows
+            }
 
     # ----------------------------------------------------------------------
     # Daily Todo 关联操作 (待办事项)
     # ----------------------------------------------------------------------
 
-    def add_todo(self, todo_date: str, task_name: str, category: str) -> int:
+    def add_todo(
+        self,
+        todo_date: str,
+        task_name: str,
+        category: str
+    ) -> int:
         """添加一条待办事项"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                INSERT INTO daily_todos (todo_date, task_name, category, completed, created_at)
+                INSERT INTO daily_todos (
+                    todo_date,
+                    task_name,
+                    category,
+                    completed,
+                    created_at
+                )
                 VALUES (?, ?, ?, 0, ?)
-            """, (todo_date, task_name, category, datetime.now().isoformat()))
+            """, (
+                todo_date,
+                task_name,
+                category,
+                datetime.now().isoformat()
+            ))
+
             conn.commit()
             return cursor.lastrowid
 
-    def update_todo_status(self, todo_id: int, completed: bool):
+    def update_todo_status(
+        self,
+        todo_id: int,
+        completed: bool
+    ):
         """更新待办事项状态"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                UPDATE daily_todos SET completed = ? WHERE id = ?
-            """, (1 if completed else 0, todo_id))
+                UPDATE daily_todos
+                SET completed = ?
+                WHERE id = ?
+            """, (
+                1 if completed else 0,
+                todo_id
+            ))
+
             conn.commit()
 
     def delete_todo(self, todo_id: int):
         """删除一条待办事项"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM daily_todos WHERE id = ?", (todo_id,))
+
+            cursor.execute(
+                "DELETE FROM daily_todos WHERE id = ?",
+                (todo_id,)
+            )
+
             conn.commit()
 
-    def get_todos_for_date(self, todo_date: str) -> List[Dict[str, Any]]:
+    def get_todos_for_date(
+        self,
+        todo_date: str
+    ) -> List[Dict[str, Any]]:
         """获取指定日期的待办列表 (格式: YYYY-MM-DD)"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                SELECT * FROM daily_todos WHERE todo_date = ? ORDER BY id ASC
+                SELECT *
+                FROM daily_todos
+                WHERE todo_date = ?
+                ORDER BY id ASC
             """, (todo_date,))
+
             rows = cursor.fetchall()
+
             return [dict(row) for row in rows]
-# --- 在 TrackerDB 类中新增以下方法 ---
 
-    def add_calendar_task(self, task_name: str, category: str, start_time: datetime, recurrence_rule: str = 'none') -> int:
+    # ----------------------------------------------------------------------
+    # Calendar Task 关联操作 (日历 / 循环任务)
+    # ----------------------------------------------------------------------
+
+    def add_calendar_task(
+        self,
+        task_name: str,
+        category: str,
+        start_time: datetime,
+        recurrence_rule: str = "none"
+    ) -> int:
         """添加日历/循环任务"""
-      with self._get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO calendar_tasks (task_name, category, start_time, recurrence_rule, is_completed, created_at)
-            VALUES (?, ?, ?, ?, 0, ?)
-        """, (
-            task_name,
-            category,
-            start_time.strftime("%Y-%m-%d %H:%M:%S"),
-            recurrence_rule,
-            datetime.now().isoformat()
-        ))
-        conn.commit()
-        return cursor.lastrowid
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
 
-    def get_calendar_tasks_for_date(self, target_date: date) -> List[Dict[str, Any]]:
-    """获取指定日期的所有任务（包含单次任务与匹配规则的循环任务）"""
-    date_str = target_date.strftime("%Y-%m-%d")
-    matched_tasks = []
+            cursor.execute("""
+                INSERT INTO calendar_tasks (
+                    task_name,
+                    category,
+                    start_time,
+                    recurrence_rule,
+                    is_completed,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, 0, ?)
+            """, (
+                task_name,
+                category,
+                start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                recurrence_rule,
+                datetime.now().isoformat()
+            ))
 
-    with self._get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM calendar_tasks")
-        rows = cursor.fetchall()
+            conn.commit()
+            return cursor.lastrowid
 
-        for row in rows:
-            task = dict(row)
-            task_dt = datetime.strptime(task["start_time"], "%Y-%m-%d %H:%M:%S")
-            task_date = task_dt.date()
-            rule = task["recurrence_rule"]
+    def get_calendar_tasks_for_date(
+        self,
+        target_date: date
+    ) -> List[Dict[str, Any]]:
+        """获取指定日期的所有任务（包含单次任务与匹配规则的循环任务）"""
 
-            # 1. 任务日期在目标日期之后，尚未开始
-            if task_date > target_date:
-                continue
+        date_str = target_date.strftime("%Y-%m-%d")
+        matched_tasks = []
 
-            # 2. 匹配逻辑
-            if rule == 'none' and task_date == target_date:
-                matched_tasks.append(task)
-            elif rule == 'daily':
-                matched_tasks.append(task)
-            elif rule == 'weekly' and task_date.weekday() == target_date.weekday():
-                matched_tasks.append(task)
-            elif rule == 'monthly' and task_date.day == target_date.day:
-                matched_tasks.append(task)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
 
-    return matched_tasks
+            cursor.execute(
+                "SELECT * FROM calendar_tasks"
+            )
+
+            rows = cursor.fetchall()
+
+            for row in rows:
+                task = dict(row)
+
+                task_dt = datetime.strptime(
+                    task["start_time"],
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+                task_date = task_dt.date()
+                rule = task["recurrence_rule"]
+
+                # 1. 任务日期在目标日期之后，尚未开始
+                if task_date > target_date:
+                    continue
+
+                # 2. 匹配逻辑
+                if rule == "none" and task_date == target_date:
+                    matched_tasks.append(task)
+
+                elif rule == "daily":
+                    matched_tasks.append(task)
+
+                elif (
+                    rule == "weekly"
+                    and task_date.weekday() == target_date.weekday()
+                ):
+                    matched_tasks.append(task)
+
+                elif (
+                    rule == "monthly"
+                    and task_date.day == target_date.day
+                ):
+                    matched_tasks.append(task)
+
+        return matched_tasks
+```
