@@ -17,7 +17,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['hook-runtime.py'], # 新增这一行！
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -40,7 +40,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # False = GUI无黑窗口；调试改成True看报错
+    console=True, # 先改成True！调试，看到报错，成功后再改False
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
