@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCalendarWidget, 
     QLabel, QPushButton, QListWidget, QListWidgetItem
