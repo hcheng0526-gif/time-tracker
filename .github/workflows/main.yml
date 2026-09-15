@@ -1,4 +1,4 @@
-name: Build Executable
+name: Build Windows EXE
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-python-version: '3.11'
+        python-version: '3.11'
 
     - name: Install Dependencies
       run: |
@@ -25,7 +25,7 @@ jobs:
 
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --noconsole --onefile main.py
+        pyinstaller --noconsole --onefile --paths=. --collect-submodules=database --collect-submodules=components --collect-submodules=widgets main.py
 
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
